@@ -12,6 +12,7 @@ import type {
 import { clampLimit, clampMinScore, normalizeWallet, parseAgentId, sanitizeQuery } from "../input-policy";
 
 type CacheEntry<T> = { expiresAt: number; value: T };
+type TrustPayload = Record<string, unknown>;
 
 interface X402LikeService {
   getFetchWithPayment?: () => typeof fetch;
@@ -22,6 +23,57 @@ interface RequestOptions {
   cacheKey?: string;
   cacheTtlMs?: number;
   query?: Record<string, string | number | boolean | undefined>;
+}
+
+function readTrimmedString(value: unknown): string | undefined {
+  if (typeof value !== "string") return undefined;
+  const normalized = value.trim();
+  return normalized.length > 0 ? normalized : undefined;
+}
+
+function readLowercaseString(value: unknown): string | undefined {
+  const normalized = readTrimmedString(value);
+  return normalized ? normalized.toLowerCase() : undefined;
+}
+
+function readBoolean(value: unknown): boolean | undefined {
+  return typeof value === "boolean" ? value : undefined;
+}
+
+function readStringArray(value: unknown): string[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const normalized = value
+    .map((entry) => (typeof entry === "string" ? entry.trim() : ""))
+    .filter((entry) => entry.length > 0);
+  return normalized;
+}
+
+function mapRiskBandToTrustTier(riskBand: string | undefined): string | undefined {
+  if (!riskBand) return undefined;
+  const normalized = riskBand.toLowerCase();
+  if (normalized.includes("critical")) return "minimal";
+  if (normalized.includes("high")) return "low";
+  if (normalized.includes("medium")) return "medium";
+  if (normalized.includes("low")) return "high";
+  return undefined;
+}
+
+function mapTrustTierToRiskBand(trustTier: string | undefined): string | undefined {
+  if (!trustTier) return undefined;
+  const normalized = trustTier.toLowerCase();
+  if (normalized === "minimal" || normalized === "new") return "critical";
+  if (normalized === "low") return "high";
+  if (normalized === "medium") return "medium";
+  if (normalized === "high") return "low";
+  return undefined;
+}
+
+function toLegacyConfidenceTier(confidence: string | undefined): string | undefined {
+  if (!confidence) return undefined;
+  const normalized = confidence.trim();
+  if (normalized.length === 0) return undefined;
+  const lower = normalized.toLowerCase();
+  return lower.charAt(0).toUpperCase() + lower.slice(1);
 }
 
 export class TrustService extends Service {
@@ -85,14 +137,28 @@ export class TrustService extends Service {
       cacheKey: `score:${normalizedAgentId}:${chain ?? ""}:${explain ? "explain" : "public"}`,
       query: { chain: chain || this.settings.defaultChain },
     });
+    const normalized = this.normalizeScoreResponse(data);
 
     return {
       kind: "agent",
-      score: Number(data.score),
-      chain: data.chain ?? chain,
-      risk_band: data.risk_band,
-      confidence_tier: data.confidence_tier,
-      raw: data,
+      score: Number(normalized.score),
+      chain: normalized.chain ?? chain,
+      score_tier: normalized.score_tier,
+      trust_tier: normalized.trust_tier,
+      confidence: normalized.confidence,
+      adjusted: normalized.adjusted,
+      adjustment_reasons: normalized.adjustment_reasons,
+      risk_band: normalized.risk_band ?? "unknown",
+      confidence_tier: normalized.confidence_tier ?? "Unknown",
+      promotion_cap_applied:
+        "promotion_cap_applied" in normalized
+          ? normalized.promotion_cap_applied
+          : normalized.adjusted,
+      promotion_cap_reasons:
+        "promotion_cap_reasons" in normalized
+          ? normalized.promotion_cap_reasons ?? normalized.adjustment_reasons
+          : normalized.adjustment_reasons,
+      raw: normalized,
     };
   }
 
@@ -107,16 +173,25 @@ export class TrustService extends Service {
       cacheKey: `wallet-score:${wallet}:${chain ?? ""}`,
       query: { chain: chain || this.settings.defaultChain },
     });
+    const normalizedData = this.normalizeWalletScoreResponse(data);
 
     return {
       kind: "wallet",
-      score: Number(data.score),
-      chain: (typeof data.chain === "string" ? data.chain : chain) || this.settings.defaultChain,
-      risk_band:
-        typeof data.risk_band === "string" ? data.risk_band : "unknown",
-      confidence_tier:
-        typeof data.confidence_tier === "string" ? data.confidence_tier : "unknown",
-      raw: data,
+      score: Number(normalizedData.score),
+      chain:
+        (typeof normalizedData.chain === "string" ? normalizedData.chain : chain)
+        || this.settings.defaultChain,
+      score_tier: normalizedData.score_tier ?? "unknown",
+      trust_tier: normalizedData.trust_tier ?? "unknown",
+      confidence: normalizedData.confidence ?? "unknown",
+      adjusted: normalizedData.adjusted ?? false,
+      adjustment_reasons: normalizedData.adjustment_reasons ?? [],
+      risk_band: normalizedData.risk_band ?? "unknown",
+      confidence_tier: normalizedData.confidence_tier ?? "Unknown",
+      promotion_cap_applied: normalizedData.promotion_cap_applied ?? normalizedData.adjusted ?? false,
+      promotion_cap_reasons:
+        normalizedData.promotion_cap_reasons ?? normalizedData.adjustment_reasons ?? [],
+      raw: normalizedData,
     };
   }
 
@@ -166,15 +241,193 @@ export class TrustService extends Service {
       cacheTtlMs: Math.max(this.settings.cacheTtlMs, 10 * 60_000),
     });
 
-    return Array.isArray(payload) ? payload : [];
+    return Array.isArray(payload) ? payload.map((item) => this.normalizeAgentItem(item)) : [];
   }
 
   private pickAgentList(payload: AgentSearchResponse): AgentSearchItem[] {
-    if (Array.isArray(payload)) return payload;
-    if (Array.isArray(payload.items)) return payload.items;
-    if (Array.isArray(payload.agents)) return payload.agents;
-    if (Array.isArray(payload.results)) return payload.results;
-    return [];
+    const items = Array.isArray(payload)
+      ? payload
+      : Array.isArray(payload.items)
+        ? payload.items
+        : Array.isArray(payload.agents)
+          ? payload.agents
+          : Array.isArray(payload.results)
+            ? payload.results
+            : [];
+
+    return items.map((item) => this.normalizeAgentItem(item));
+  }
+
+  private normalizeScoreResponse(
+    data: ScorePublicResponse | ScoreExplainResponse,
+  ): ScorePublicResponse | ScoreExplainResponse {
+    const payload = data as unknown as TrustPayload;
+    const scoreTier = this.readScoreTier(payload) ?? "unknown";
+    const trustTier = this.readTrustTier(payload) ?? "unknown";
+    const confidence = this.readConfidence(payload) ?? "unknown";
+    const adjusted = this.readAdjusted(payload) ?? false;
+    const adjustmentReasons = this.readAdjustmentReasons(payload);
+    const riskBand = this.readRiskBand(payload, trustTier) ?? "unknown";
+    const confidenceTier = this.readLegacyConfidenceTier(payload, confidence) ?? "Unknown";
+
+    const normalizedBase: ScorePublicResponse = {
+      ...data,
+      agent_id: Number(data.agent_id),
+      chain: typeof data.chain === "string" ? data.chain : "",
+      global_id: typeof data.global_id === "string" ? data.global_id : "",
+      score: Number(data.score),
+      score_tier: scoreTier,
+      trust_tier: trustTier,
+      confidence,
+      adjusted,
+      adjustment_reasons: adjustmentReasons,
+      risk_band: riskBand,
+      confidence_tier: confidenceTier,
+      validator_count_bucket:
+        typeof data.validator_count_bucket === "string" ? data.validator_count_bucket : "",
+      as_of: typeof data.as_of === "string" ? data.as_of : "",
+      disclaimer: typeof data.disclaimer === "string" ? data.disclaimer : "",
+    };
+
+    if ("positives" in data || "cautions" in data) {
+      return {
+        ...normalizedBase,
+        positives: readStringArray((data as unknown as TrustPayload).positives) ?? [],
+        cautions: readStringArray((data as unknown as TrustPayload).cautions) ?? [],
+        final_tier: readTrimmedString(payload.final_tier) ?? scoreTier,
+        candidate_tier: readTrimmedString(payload.candidate_tier),
+        promotion_cap_applied: this.readLegacyPromotionCapApplied(payload, adjusted) ?? adjusted,
+        promotion_cap_reasons: this.readLegacyPromotionCapReasons(payload, adjustmentReasons),
+        promotion_cap_to:
+          typeof payload.promotion_cap_to === "string" || payload.promotion_cap_to === null
+            ? (payload.promotion_cap_to as string | null)
+            : null,
+      };
+    }
+
+    return normalizedBase;
+  }
+
+  private normalizeWalletScoreResponse(data: WalletScoreResponse): WalletScoreResponse {
+    const payload = data as unknown as TrustPayload;
+    const normalized: WalletScoreResponse = {
+      ...data,
+      wallet: typeof data.wallet === "string" ? data.wallet : "",
+      score: Number(data.score),
+    };
+
+    const scoreTier = this.readScoreTier(payload);
+    const trustTier = this.readTrustTier(payload);
+    const confidence = this.readConfidence(payload);
+    const adjusted = this.readAdjusted(payload);
+    const adjustmentReasons = this.readAdjustmentReasons(payload);
+    const riskBand = this.readRiskBand(payload, trustTier);
+    const confidenceTier = this.readLegacyConfidenceTier(payload, confidence);
+    const promotionCapApplied = this.readLegacyPromotionCapApplied(payload, adjusted);
+    const promotionCapReasons = this.readLegacyPromotionCapReasons(payload, adjustmentReasons);
+
+    if (scoreTier) normalized.score_tier = scoreTier;
+    if (trustTier) normalized.trust_tier = trustTier;
+    if (confidence) normalized.confidence = confidence;
+    if (adjusted !== undefined) normalized.adjusted = adjusted;
+    normalized.adjustment_reasons = adjustmentReasons;
+    if (riskBand) normalized.risk_band = riskBand;
+    if (confidenceTier) normalized.confidence_tier = confidenceTier;
+    if (promotionCapApplied !== undefined) normalized.promotion_cap_applied = promotionCapApplied;
+    normalized.promotion_cap_reasons = promotionCapReasons;
+
+    return normalized;
+  }
+
+  private normalizeAgentItem(item: AgentSearchItem): AgentSearchItem {
+    const payload = item as unknown as TrustPayload;
+    const normalized: AgentSearchItem = {
+      ...item,
+      agent_id: Number(item.agent_id),
+      score: typeof item.score === "number" ? item.score : undefined,
+    };
+
+    const scoreTier = this.readScoreTier(payload);
+    const trustTier = this.readTrustTier(payload);
+    const confidence = this.readConfidence(payload);
+    const adjusted = this.readAdjusted(payload);
+    const adjustmentReasons = this.readAdjustmentReasons(payload);
+    const riskBand = this.readRiskBand(payload, trustTier);
+    const confidenceTier = this.readLegacyConfidenceTier(payload, confidence);
+    const promotionCapApplied = this.readLegacyPromotionCapApplied(payload, adjusted);
+    const promotionCapReasons = this.readLegacyPromotionCapReasons(payload, adjustmentReasons);
+
+    if (scoreTier) normalized.score_tier = scoreTier;
+    if (trustTier) normalized.trust_tier = trustTier;
+    if (confidence) normalized.confidence = confidence;
+    if (adjusted !== undefined) normalized.adjusted = adjusted;
+    normalized.adjustment_reasons = adjustmentReasons;
+    if (riskBand) normalized.risk_band = riskBand;
+    if (confidenceTier) normalized.confidence_tier = confidenceTier;
+    if (promotionCapApplied !== undefined) normalized.promotion_cap_applied = promotionCapApplied;
+    normalized.promotion_cap_reasons = promotionCapReasons;
+
+    return normalized;
+  }
+
+  private readScoreTier(payload: TrustPayload): string | undefined {
+    return (
+      readLowercaseString(payload.score_tier)
+      ?? readLowercaseString(payload.final_tier)
+      ?? readLowercaseString(payload.candidate_tier)
+    );
+  }
+
+  private readTrustTier(payload: TrustPayload): string | undefined {
+    return readLowercaseString(payload.trust_tier)
+      ?? mapRiskBandToTrustTier(readLowercaseString(payload.risk_band));
+  }
+
+  private readRiskBand(payload: TrustPayload, trustTier?: string): string | undefined {
+    return readLowercaseString(payload.risk_band)
+      ?? mapTrustTierToRiskBand(trustTier ?? readLowercaseString(payload.trust_tier));
+  }
+
+  private readConfidence(payload: TrustPayload): string | undefined {
+    return readLowercaseString(payload.confidence)
+      ?? readLowercaseString(payload.confidence_tier);
+  }
+
+  private readLegacyConfidenceTier(
+    payload: TrustPayload,
+    confidence?: string,
+  ): string | undefined {
+    return readTrimmedString(payload.confidence_tier)
+      ?? toLegacyConfidenceTier(confidence ?? this.readConfidence(payload));
+  }
+
+  private readAdjusted(payload: TrustPayload): boolean | undefined {
+    return readBoolean(payload.adjusted)
+      ?? readBoolean(payload.promotion_cap_applied);
+  }
+
+  private readLegacyPromotionCapApplied(
+    payload: TrustPayload,
+    adjusted?: boolean,
+  ): boolean | undefined {
+    return readBoolean(payload.promotion_cap_applied)
+      ?? adjusted
+      ?? this.readAdjusted(payload);
+  }
+
+  private readAdjustmentReasons(payload: TrustPayload): string[] {
+    return readStringArray(payload.adjustment_reasons)
+      ?? readStringArray(payload.promotion_cap_reasons)
+      ?? [];
+  }
+
+  private readLegacyPromotionCapReasons(
+    payload: TrustPayload,
+    adjustmentReasons?: string[],
+  ): string[] {
+    return readStringArray(payload.promotion_cap_reasons)
+      ?? adjustmentReasons
+      ?? this.readAdjustmentReasons(payload);
   }
 
   private getCached<T>(key: string): T | undefined {

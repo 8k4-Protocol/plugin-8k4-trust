@@ -46,7 +46,7 @@ function inferExplainFromText(text: string): boolean {
 export const checkTrustAction: Action = {
   name: "CHECK_AGENT_TRUST",
   description:
-    "Check 8K4 trust for an ERC-8004 agent ID (integer) or wallet address. Returns score, confidence tier, and risk band.",
+    "Check 8K4 trust for an ERC-8004 agent ID (integer) or wallet address. Returns score, score tier, trust tier, and confidence.",
   similes: [
     "CHECK_TRUST",
     "CHECK_8K4_TRUST",
@@ -116,10 +116,19 @@ export const checkTrustAction: Action = {
         `[8K4 Trust]`,
         `Target: ${targetLabel} (${result.kind})`,
         `Score: ${result.score}`,
-        `Risk band: ${result.risk_band ?? "unknown"}`,
-        `Confidence tier: ${result.confidence_tier ?? "unknown"}`,
+        `Score tier: ${result.score_tier ?? "unknown"}`,
+        `Trust tier: ${result.trust_tier ?? "unknown"}`,
+        `Confidence: ${result.confidence ?? "unknown"}`,
+        `Adjusted: ${result.adjusted ? "yes" : "no"}`,
         `Chain: ${result.chain ?? service.getConfig().defaultChain}`,
       ];
+
+      if (
+        Array.isArray(result.adjustment_reasons)
+        && result.adjustment_reasons.length > 0
+      ) {
+        lines.push(`Adjustment reasons: ${result.adjustment_reasons.join("; ")}`);
+      }
 
       if (target.kind === "agent" && explain) {
         const details = result.raw as ScoreExplainResponse;
@@ -128,21 +137,6 @@ export const checkTrustAction: Action = {
         }
         if (Array.isArray(details.cautions) && details.cautions.length > 0) {
           lines.push(`Cautions: ${details.cautions.join("; ")}`);
-        }
-        if (typeof details.candidate_tier === "string" && details.candidate_tier.length > 0) {
-          lines.push(`Candidate tier: ${details.candidate_tier}`);
-        }
-        if (typeof details.final_tier === "string" && details.final_tier.length > 0) {
-          lines.push(`Final tier: ${details.final_tier}`);
-        }
-        if (details.promotion_cap_applied) {
-          lines.push("Promotion cap applied: true");
-        }
-        if (
-          Array.isArray(details.promotion_cap_reasons) &&
-          details.promotion_cap_reasons.length > 0
-        ) {
-          lines.push(`Promotion cap reasons: ${details.promotion_cap_reasons.join("; ")}`);
         }
       }
 
@@ -160,8 +154,11 @@ export const checkTrustAction: Action = {
           target: target.kind === "wallet" ? target.value : String(target.value),
           targetKind: result.kind,
           score: result.score,
-          risk_band: result.risk_band,
-          confidence_tier: result.confidence_tier,
+          score_tier: result.score_tier,
+          trust_tier: result.trust_tier,
+          confidence: result.confidence,
+          adjusted: result.adjusted,
+          adjustment_reasons: result.adjustment_reasons,
           chain: result.chain,
           raw: result.raw,
         },

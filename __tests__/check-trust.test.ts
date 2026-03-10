@@ -21,8 +21,11 @@ describe("CHECK_AGENT_TRUST action", () => {
         kind: "wallet",
         score: 80,
         chain: "eth",
-        risk_band: "low",
-        confidence_tier: "High",
+        score_tier: "high",
+        trust_tier: "high",
+        confidence: "high",
+        adjusted: false,
+        adjustment_reasons: [],
         raw: {},
       }),
       checkTrust: vi.fn(),
@@ -42,6 +45,7 @@ describe("CHECK_AGENT_TRUST action", () => {
     expect(service.checkWalletTrust).toHaveBeenCalledWith(wallet, undefined);
     expect(service.checkTrust).not.toHaveBeenCalled();
     expect((result as any).success).toBe(true);
+    expect((result as any).text).toContain("Trust tier: high");
   });
 
   it("handles numeric agent ID input", async () => {
@@ -51,8 +55,11 @@ describe("CHECK_AGENT_TRUST action", () => {
         kind: "agent",
         score: 72,
         chain: "base",
-        risk_band: "medium",
-        confidence_tier: "Medium",
+        score_tier: "medium",
+        trust_tier: "medium",
+        confidence: "medium",
+        adjusted: true,
+        adjustment_reasons: ["manual review adjustment"],
         raw: {},
       }),
       getConfig: vi.fn().mockReturnValue({ defaultChain: "eth" }),
@@ -68,6 +75,7 @@ describe("CHECK_AGENT_TRUST action", () => {
 
     expect(service.checkTrust).toHaveBeenCalledWith(6888, "base", false);
     expect((result as any).success).toBe(true);
+    expect((result as any).data.trust_tier).toBe("medium");
   });
 
   it("uses only explicit agent-id patterns from free text", async () => {
@@ -77,8 +85,11 @@ describe("CHECK_AGENT_TRUST action", () => {
         kind: "agent",
         score: 72,
         chain: "eth",
-        risk_band: "medium",
-        confidence_tier: "Medium",
+        score_tier: "medium",
+        trust_tier: "medium",
+        confidence: "medium",
+        adjusted: false,
+        adjustment_reasons: [],
         raw: {},
       }),
       getConfig: vi.fn().mockReturnValue({ defaultChain: "eth" }),
@@ -138,8 +149,11 @@ describe("CHECK_AGENT_TRUST action", () => {
         kind: "agent",
         score: 90,
         chain: "eth",
-        risk_band: "low",
-        confidence_tier: "High",
+        score_tier: "high",
+        trust_tier: "high",
+        confidence: "high",
+        adjusted: false,
+        adjustment_reasons: [],
         raw: { positives: ["good"], cautions: [] },
       }),
       getConfig: vi.fn().mockReturnValue({ defaultChain: "eth" }),
@@ -161,8 +175,11 @@ describe("CHECK_AGENT_TRUST action", () => {
         kind: "agent",
         score: 90,
         chain: "eth",
-        risk_band: "low",
-        confidence_tier: "High",
+        score_tier: "high",
+        trust_tier: "high",
+        confidence: "high",
+        adjusted: false,
+        adjustment_reasons: [],
         raw: { positives: ["good"], cautions: [] },
       }),
       getConfig: vi.fn().mockReturnValue({ defaultChain: "eth" }),

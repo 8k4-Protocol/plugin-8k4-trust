@@ -1,56 +1,74 @@
-export type ConfidenceTier = "Minimal" | "Low" | "Medium" | "High" | string;
+export type PublicConfidence = "minimal" | "low" | "medium" | "high" | "unknown" | string;
+export type TrustTier = "new" | "minimal" | "low" | "medium" | "high" | "unknown" | string;
+export type ScoreTier = string;
+export type LegacyConfidenceTier = "Minimal" | "Low" | "Medium" | "High" | "Unknown" | string;
+export type LegacyRiskBand = "low" | "medium" | "high" | "critical" | "unknown" | string;
 
-export interface ScorePublicResponse {
+export interface LegacyTrustAliases {
+  // Transitional aliases preserved for downstream mixed-version consumers.
+  risk_band?: LegacyRiskBand;
+  confidence_tier?: LegacyConfidenceTier;
+}
+
+export interface LegacyAdjustmentAliases {
+  // Transitional aliases preserved for downstream mixed-version consumers.
+  promotion_cap_applied?: boolean;
+  promotion_cap_reasons?: string[];
+}
+
+export interface PublicTrustFields {
+  score_tier: ScoreTier;
+  trust_tier: TrustTier;
+  confidence: PublicConfidence;
+  adjusted: boolean;
+  adjustment_reasons: string[];
+}
+
+export interface ScorePublicResponse extends PublicTrustFields, LegacyTrustAliases {
   agent_id: number;
   chain: string;
   global_id: string;
   score: number;
-  confidence_tier: ConfidenceTier;
-  risk_band: string;
   validator_count_bucket: string;
   as_of: string;
   disclaimer: string;
 }
 
-export interface ScoreExplainResponse {
-  agent_id: number;
-  chain: string;
-  global_id: string;
-  score: number;
-  confidence_tier: ConfidenceTier;
-  candidate_tier: string;
-  final_tier: string;
-  promotion_cap_applied: boolean;
-  promotion_cap_to: string | null;
-  promotion_cap_reasons: string[];
-  risk_band: string;
-  as_of: string;
-  disclaimer: string;
+export interface ScoreExplainResponse extends ScorePublicResponse, LegacyAdjustmentAliases {
+  candidate_tier?: ScoreTier;
+  final_tier?: ScoreTier;
+  promotion_cap_to?: string | null;
   positives: string[];
   cautions: string[];
 }
 
 // Best-effort typing: wallet score response fields are not fully verified against the live API yet.
-export interface WalletScoreResponse {
+export interface WalletScoreResponse extends LegacyTrustAliases, LegacyAdjustmentAliases {
   wallet: string;
   chain?: string;
   score: number;
-  confidence_tier?: string;
-  risk_band?: string;
+  score_tier?: ScoreTier;
+  trust_tier?: TrustTier;
+  confidence?: PublicConfidence;
+  adjusted?: boolean;
+  adjustment_reasons?: string[];
   as_of?: string;
   disclaimer?: string;
   [key: string]: unknown;
 }
 
-export interface AgentSearchItem {
+export interface AgentSearchItem extends LegacyTrustAliases, LegacyAdjustmentAliases {
   agent_id: number;
   rank?: number;
   wallet?: string;
   chain?: string;
   global_id?: string;
   score?: number;
-  confidence_tier?: string;
-  risk_band?: string;
+  score_tier?: ScoreTier;
+  trust_tier?: TrustTier;
+  confidence?: PublicConfidence;
+  adjusted?: boolean;
+  adjustment_reasons?: string[];
   contactable?: boolean;
   [key: string]: unknown;
 }
@@ -67,11 +85,14 @@ export type AgentSearchResponse =
 
 export type TopAgentsResponse = AgentSearchItem[];
 
-export interface TrustCheckResult {
+export interface TrustCheckResult extends LegacyTrustAliases, LegacyAdjustmentAliases {
   kind: "agent" | "wallet";
   score: number;
   chain?: string;
-  risk_band?: string;
-  confidence_tier?: string;
+  score_tier?: ScoreTier;
+  trust_tier?: TrustTier;
+  confidence?: PublicConfidence;
+  adjusted?: boolean;
+  adjustment_reasons?: string[];
   raw: ScorePublicResponse | ScoreExplainResponse | WalletScoreResponse;
 }

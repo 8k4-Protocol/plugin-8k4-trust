@@ -12,16 +12,21 @@ export const extractTargets = extractTrustTargets;
 
 function shouldWarnOrBlock(
   score: number,
-  riskBand: string,
+  trustTier: string | undefined,
+  riskBand: string | undefined,
   cautionThreshold: number,
   blockThreshold: number,
 ): { caution: boolean; block: boolean } {
-  const normalizedBand = riskBand.toLowerCase();
-  const highRiskBand = normalizedBand.includes("high") || normalizedBand.includes("critical");
+  const normalizedTier = (trustTier ?? "").toLowerCase();
+  const normalizedBand = (riskBand ?? "").toLowerCase();
+
+  const lowTrust = normalizedTier === "low";
+  const minimalTrust = normalizedTier === "minimal" || normalizedTier === "new";
+  const legacyHighRisk = normalizedBand.includes("high") || normalizedBand.includes("critical");
 
   return {
-    caution: score < cautionThreshold || highRiskBand,
-    block: score < blockThreshold || highRiskBand,
+    caution: score < cautionThreshold || lowTrust || minimalTrust || legacyHighRisk,
+    block: score < blockThreshold || minimalTrust || legacyHighRisk,
   };
 }
 
@@ -48,6 +53,26 @@ function enforcementFailure(
     blocked: false,
     reason: `Trust guard enforcement failed (fail-open): ${reason}${suffix}`,
   };
+}
+
+function describeTrust(score: {
+  score: number;
+  trust_tier?: string;
+  risk_band?: string;
+  confidence?: string;
+  confidence_tier?: string;
+}): string {
+  const parts = [
+    `score=${score.score}`,
+    `trust_tier=${score.trust_tier ?? "unknown"}`,
+  ];
+
+  if (score.risk_band) {
+    parts.push(`risk_band=${score.risk_band}`);
+  }
+
+  parts.push(`confidence=${score.confidence ?? score.confidence_tier ?? "unknown"}`);
+  return parts.join(" ");
 }
 
 const trustGuardEvaluatorImpl = {
@@ -84,7 +109,8 @@ const trustGuardEvaluatorImpl = {
         const score = await trust.checkWalletTrust(wallet, config.defaultChain);
         const decision = shouldWarnOrBlock(
           score.score,
-          score.risk_band ?? "",
+          score.trust_tier,
+          score.risk_band,
           config.guardCautionThreshold,
           config.guardBlockThreshold,
         );
@@ -92,7 +118,7 @@ const trustGuardEvaluatorImpl = {
         if (config.guardMode === "block" && decision.block) {
           return {
             blocked: true,
-            reason: `Blocked by trust guard: wallet ${wallet} score=${score.score}, risk=${score.risk_band}`,
+            reason: `Blocked by trust guard: wallet ${wallet} ${describeTrust(score)}`,
           };
         }
 
@@ -100,7 +126,7 @@ const trustGuardEvaluatorImpl = {
           return {
             blocked: false,
             rewrittenText:
-              `[TRUST-GUARD WARNING] wallet=${wallet} score=${score.score} risk=${score.risk_band} confidence=${score.confidence_tier}\n` +
+              `[TRUST-GUARD WARNING] wallet=${wallet} ${describeTrust(score)}\n` +
               text,
             reason: "Trust guard caution",
           };
@@ -111,7 +137,8 @@ const trustGuardEvaluatorImpl = {
         const score = await trust.checkTrust(agentId, config.defaultChain, false);
         const decision = shouldWarnOrBlock(
           score.score,
-          score.risk_band ?? "",
+          score.trust_tier,
+          score.risk_band,
           config.guardCautionThreshold,
           config.guardBlockThreshold,
         );
@@ -119,7 +146,7 @@ const trustGuardEvaluatorImpl = {
         if (config.guardMode === "block" && decision.block) {
           return {
             blocked: true,
-            reason: `Blocked by trust guard: agent_id=${agentId} score=${score.score}, risk=${score.risk_band}`,
+            reason: `Blocked by trust guard: agent_id=${agentId} ${describeTrust(score)}`,
           };
         }
 
@@ -127,7 +154,7 @@ const trustGuardEvaluatorImpl = {
           return {
             blocked: false,
             rewrittenText:
-              `[TRUST-GUARD WARNING] agent_id=${agentId} score=${score.score} risk=${score.risk_band} confidence=${score.confidence_tier}\n` +
+              `[TRUST-GUARD WARNING] agent_id=${agentId} ${describeTrust(score)}\n` +
               text,
             reason: "Trust guard caution",
           };
