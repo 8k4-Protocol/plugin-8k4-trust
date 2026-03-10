@@ -128,7 +128,7 @@ export const findTrustedAgentAction: Action = {
       const lines = ["[8K4 Trusted Agent Search]", `Query: ${query}`, "Top matches:"];
       for (const [index, item] of results.slice(0, 10).entries()) {
         lines.push(
-          `${index + 1}. agent_id=${item.agent_id} score=${item.score ?? "n/a"} risk=${item.risk_band ?? "n/a"} confidence=${item.confidence_tier ?? "n/a"} chain=${item.chain ?? "n/a"}`,
+          `${index + 1}. agent_id=${item.agent_id} score=${item.score ?? "n/a"} trust=${item.trust_tier ?? "n/a"} confidence=${item.confidence ?? "n/a"} chain=${item.chain ?? "n/a"}`,
         );
       }
 

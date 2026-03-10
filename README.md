@@ -14,7 +14,7 @@ bun add @8k4protocol/plugin-trust
 
 - `CHECK_AGENT_TRUST` — check trust for an ERC-8004 agent ID or wallet
 - `FIND_TRUSTED_AGENT` — search for trusted counterparties for a task
-- trust guard pre-evaluator — warn or block before risky interactions
+- trust guard pre-evaluator — warn or block before low-trust interactions
 - trust context provider — inject current `/agents/top` trust context into runtime
 
 ## Development / Local Install
@@ -61,7 +61,7 @@ Or in JSON-style character configs:
 | `EIGHTK4_DEFAULT_CHAIN` | No | `eth` | Default chain for score/search calls. |
 | `EIGHTK4_GUARD_MODE` | No | `warn` | Trust guard mode: `off`, `warn`, or `block`. |
 | `EIGHTK4_GUARD_FAIL_MODE` | No | derived | Enforcement failure behavior: `open` or `closed`. Defaults to `open` in `warn` mode and `closed` in `block` mode unless explicitly set. |
-| `EIGHTK4_GUARD_BLOCK_THRESHOLD` | No | `30` | In `block` mode, block if score is below this threshold (or high-risk band). |
+| `EIGHTK4_GUARD_BLOCK_THRESHOLD` | No | `30` | In `block` mode, block if score is below this threshold or trust tier is `minimal`/`new`. |
 | `EIGHTK4_GUARD_CAUTION_THRESHOLD` | No | `60` | In `warn`/`block` mode, warn if score is below this threshold. |
 | `EIGHTK4_CACHE_TTL_MS` | No | `300000` | In-memory cache TTL for trust/search/top responses. Clamped to `1000..3600000`. |
 | `EIGHTK4_CACHE_MAX_ENTRIES` | No | `500` | Maximum in-memory cache entries before oldest entries are evicted. Clamped to `50..10000`. |
@@ -126,8 +126,11 @@ Parameters:
 
 Output includes:
 - `score`
-- `confidence_tier`
-- `risk_band`
+- `score_tier`
+- `trust_tier`
+- `confidence`
+- `adjusted`
+- `adjustment_reasons`
 - optional `positives/cautions` when `explain=true`
 
 ### `FIND_TRUSTED_AGENT`
@@ -147,8 +150,8 @@ Parameters:
 
 Mode behavior:
 - `off`: no trust guard checks.
-- `warn`: message is allowed, but warning context is injected when trust is low/high-risk.
-- `block`: low-trust/high-risk interactions are blocked before normal response processing.
+- `warn`: message is allowed, but warning context is injected when trust is low or the score falls below the caution threshold.
+- `block`: minimal/new-trust interactions or scores below the block threshold are blocked before normal response processing.
 
 Example settings:
 

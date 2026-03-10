@@ -49,7 +49,7 @@ describe("trust guard evaluator", () => {
 
   it("returns warning in warn mode for low-score agent", async () => {
     const trustService = {
-      checkTrust: vi.fn().mockResolvedValue({ score: 40, risk_band: "medium", confidence_tier: "Low" }),
+      checkTrust: vi.fn().mockResolvedValue({ score: 40, trust_tier: "medium", confidence: "low" }),
     } as Partial<TrustService>;
 
     const runtime = createRuntime({ EIGHTK4_GUARD_MODE: "warn" }, trustService);
@@ -61,7 +61,7 @@ describe("trust guard evaluator", () => {
 
   it("blocks in block mode for below-threshold score", async () => {
     const trustService = {
-      checkTrust: vi.fn().mockResolvedValue({ score: 10, risk_band: "low", confidence_tier: "Low" }),
+      checkTrust: vi.fn().mockResolvedValue({ score: 10, trust_tier: "high", confidence: "low" }),
     } as Partial<TrustService>;
 
     const runtime = createRuntime(
@@ -76,6 +76,18 @@ describe("trust guard evaluator", () => {
 
     expect(result.blocked).toBe(true);
     expect(result.reason).toContain("Blocked by trust guard");
+  });
+
+  it("blocks in block mode for minimal trust tier even with a decent score", async () => {
+    const trustService = {
+      checkTrust: vi.fn().mockResolvedValue({ score: 85, trust_tier: "minimal", confidence: "high" }),
+    } as Partial<TrustService>;
+
+    const runtime = createRuntime({ EIGHTK4_GUARD_MODE: "block" }, trustService);
+    const result = await trustGuardEvaluator.handler(runtime, { content: { text: "agent:777" } } as any);
+
+    expect(result.blocked).toBe(true);
+    expect(result.reason).toContain("trust_tier=minimal");
   });
 
   it("fails open on API error", async () => {

@@ -12,16 +12,17 @@ export const extractTargets = extractTrustTargets;
 
 function shouldWarnOrBlock(
   score: number,
-  riskBand: string,
+  trustTier: string,
   cautionThreshold: number,
   blockThreshold: number,
 ): { caution: boolean; block: boolean } {
-  const normalizedBand = riskBand.toLowerCase();
-  const highRiskBand = normalizedBand.includes("high") || normalizedBand.includes("critical");
+  const normalizedTier = trustTier.toLowerCase();
+  const lowTrust = normalizedTier === "low";
+  const minimalTrust = normalizedTier === "minimal" || normalizedTier === "new";
 
   return {
-    caution: score < cautionThreshold || highRiskBand,
-    block: score < blockThreshold || highRiskBand,
+    caution: score < cautionThreshold || lowTrust || minimalTrust,
+    block: score < blockThreshold || minimalTrust,
   };
 }
 
@@ -84,7 +85,7 @@ const trustGuardEvaluatorImpl = {
         const score = await trust.checkWalletTrust(wallet, config.defaultChain);
         const decision = shouldWarnOrBlock(
           score.score,
-          score.risk_band ?? "",
+          score.trust_tier ?? "",
           config.guardCautionThreshold,
           config.guardBlockThreshold,
         );
@@ -92,7 +93,7 @@ const trustGuardEvaluatorImpl = {
         if (config.guardMode === "block" && decision.block) {
           return {
             blocked: true,
-            reason: `Blocked by trust guard: wallet ${wallet} score=${score.score}, risk=${score.risk_band}`,
+            reason: `Blocked by trust guard: wallet ${wallet} score=${score.score}, trust_tier=${score.trust_tier}`,
           };
         }
 
@@ -100,7 +101,7 @@ const trustGuardEvaluatorImpl = {
           return {
             blocked: false,
             rewrittenText:
-              `[TRUST-GUARD WARNING] wallet=${wallet} score=${score.score} risk=${score.risk_band} confidence=${score.confidence_tier}\n` +
+              `[TRUST-GUARD WARNING] wallet=${wallet} score=${score.score} trust_tier=${score.trust_tier} confidence=${score.confidence}\n` +
               text,
             reason: "Trust guard caution",
           };
@@ -111,7 +112,7 @@ const trustGuardEvaluatorImpl = {
         const score = await trust.checkTrust(agentId, config.defaultChain, false);
         const decision = shouldWarnOrBlock(
           score.score,
-          score.risk_band ?? "",
+          score.trust_tier ?? "",
           config.guardCautionThreshold,
           config.guardBlockThreshold,
         );
@@ -119,7 +120,7 @@ const trustGuardEvaluatorImpl = {
         if (config.guardMode === "block" && decision.block) {
           return {
             blocked: true,
-            reason: `Blocked by trust guard: agent_id=${agentId} score=${score.score}, risk=${score.risk_band}`,
+            reason: `Blocked by trust guard: agent_id=${agentId} score=${score.score}, trust_tier=${score.trust_tier}`,
           };
         }
 
@@ -127,7 +128,7 @@ const trustGuardEvaluatorImpl = {
           return {
             blocked: false,
             rewrittenText:
-              `[TRUST-GUARD WARNING] agent_id=${agentId} score=${score.score} risk=${score.risk_band} confidence=${score.confidence_tier}\n` +
+              `[TRUST-GUARD WARNING] agent_id=${agentId} score=${score.score} trust_tier=${score.trust_tier} confidence=${score.confidence}\n` +
               text,
             reason: "Trust guard caution",
           };

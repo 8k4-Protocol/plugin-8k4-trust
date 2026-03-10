@@ -8,12 +8,23 @@ function sanitizeText(value: unknown, maxLength = 80): string | undefined {
   return sanitized.length > 0 ? sanitized.slice(0, maxLength) : undefined;
 }
 
+function sanitizeStringArray(value: unknown, maxLength = 120): string[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const sanitized = value
+    .map((entry) => sanitizeText(entry, maxLength))
+    .filter((entry): entry is string => typeof entry === "string" && entry.length > 0);
+  return sanitized.length > 0 ? sanitized : undefined;
+}
+
 function toSafeContextAgent(agent: AgentSearchItem) {
   return {
     agent_id: agent.agent_id,
     score: typeof agent.score === "number" ? agent.score : undefined,
-    risk_band: sanitizeText(agent.risk_band),
-    confidence_tier: sanitizeText(agent.confidence_tier),
+    score_tier: sanitizeText(agent.score_tier),
+    trust_tier: sanitizeText(agent.trust_tier),
+    confidence: sanitizeText(agent.confidence),
+    adjusted: typeof agent.adjusted === "boolean" ? agent.adjusted : undefined,
+    adjustment_reasons: sanitizeStringArray(agent.adjustment_reasons),
     chain: sanitizeText(agent.chain),
     wallet: sanitizeText(agent.wallet, 42),
     global_id: sanitizeText(agent.global_id),

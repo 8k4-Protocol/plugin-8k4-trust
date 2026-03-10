@@ -1,31 +1,26 @@
-export type ConfidenceTier = "Minimal" | "Low" | "Medium" | "High" | string;
+export type PublicConfidence = "minimal" | "low" | "medium" | "high" | string;
+export type TrustTier = "new" | "minimal" | "low" | "medium" | "high" | string;
+export type ScoreTier = string;
 
-export interface ScorePublicResponse {
+export interface PublicTrustFields {
+  score_tier: ScoreTier;
+  trust_tier: TrustTier;
+  confidence: PublicConfidence;
+  adjusted: boolean;
+  adjustment_reasons: string[];
+}
+
+export interface ScorePublicResponse extends PublicTrustFields {
   agent_id: number;
   chain: string;
   global_id: string;
   score: number;
-  confidence_tier: ConfidenceTier;
-  risk_band: string;
   validator_count_bucket: string;
   as_of: string;
   disclaimer: string;
 }
 
-export interface ScoreExplainResponse {
-  agent_id: number;
-  chain: string;
-  global_id: string;
-  score: number;
-  confidence_tier: ConfidenceTier;
-  candidate_tier: string;
-  final_tier: string;
-  promotion_cap_applied: boolean;
-  promotion_cap_to: string | null;
-  promotion_cap_reasons: string[];
-  risk_band: string;
-  as_of: string;
-  disclaimer: string;
+export interface ScoreExplainResponse extends ScorePublicResponse {
   positives: string[];
   cautions: string[];
 }
@@ -35,8 +30,11 @@ export interface WalletScoreResponse {
   wallet: string;
   chain?: string;
   score: number;
-  confidence_tier?: string;
-  risk_band?: string;
+  score_tier?: ScoreTier;
+  trust_tier?: TrustTier;
+  confidence?: PublicConfidence;
+  adjusted?: boolean;
+  adjustment_reasons?: string[];
   as_of?: string;
   disclaimer?: string;
   [key: string]: unknown;
@@ -49,8 +47,11 @@ export interface AgentSearchItem {
   chain?: string;
   global_id?: string;
   score?: number;
-  confidence_tier?: string;
-  risk_band?: string;
+  score_tier?: ScoreTier;
+  trust_tier?: TrustTier;
+  confidence?: PublicConfidence;
+  adjusted?: boolean;
+  adjustment_reasons?: string[];
   contactable?: boolean;
   [key: string]: unknown;
 }
@@ -71,7 +72,10 @@ export interface TrustCheckResult {
   kind: "agent" | "wallet";
   score: number;
   chain?: string;
-  risk_band?: string;
-  confidence_tier?: string;
+  score_tier?: ScoreTier;
+  trust_tier?: TrustTier;
+  confidence?: PublicConfidence;
+  adjusted?: boolean;
+  adjustment_reasons?: string[];
   raw: ScorePublicResponse | ScoreExplainResponse | WalletScoreResponse;
 }
