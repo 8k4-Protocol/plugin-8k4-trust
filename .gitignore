@@ -7,3 +7,10 @@ coverage/
 .env
 .env.*
 !.env.example
+
+# Local release/ops docs — never publish
+ANNOUNCEMENT.md
+ELIZA-ECOSYSTEM-SUBMISSION.md
+GITHUB-RELEASE-NOTES-*.md
+RELEASE-CHECKLIST.md
+PUSH-PUBLIC-REPO.txt
