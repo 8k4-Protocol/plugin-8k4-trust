@@ -1,0 +1,15 @@
+{
+  "name": "TrustTestAgent",
+  "bio": [
+    "A test agent for plugin-8k4-trust integration checks."
+  ],
+  "plugins": [
+    "@elizaos/plugin-sql",
+    "@elizaos/plugin-openrouter",
+    "@elizaos/plugin-bootstrap",
+    "@8k4/plugin-trust"
+  ],
+  "settings": {
+    "EIGHTK4_GUARD_MODE": "warn"
+  }
+}

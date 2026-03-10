@@ -1,0 +1,55 @@
+{
+  "name": "@8k4/plugin-trust",
+  "version": "0.1.0",
+  "description": "8K4 Protocol trust scoring plugin for ElizaOS — check agent trust scores before interacting",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "test": "vitest run",
+    "prepublishOnly": "npm run build && npm run test"
+  },
+  "peerDependencies": {
+    "@elizaos/core": ">=1.0.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.4"
+  },
+  "keywords": [
+    "elizaos",
+    "plugin",
+    "trust",
+    "8k4",
+    "erc-8004",
+    "agent-trust"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/8k4protocol/plugin-8k4-trust.git"
+  },
+  "homepage": "https://github.com/8k4protocol/plugin-8k4-trust#readme",
+  "bugs": {
+    "url": "https://github.com/8k4protocol/plugin-8k4-trust/issues"
+  },
+  "elizaos": {
+    "type": "plugin",
+    "name": "@8k4/plugin-trust",
+    "displayName": "8K4 Trust Plugin",
+    "category": "trust-and-safety"
+  }
+}
