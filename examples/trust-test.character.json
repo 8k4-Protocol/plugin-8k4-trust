@@ -7,7 +7,7 @@
     "@elizaos/plugin-sql",
     "@elizaos/plugin-openrouter",
     "@elizaos/plugin-bootstrap",
-    "@8k4/plugin-trust"
+    "@8k4protocol/plugin-trust"
   ],
   "settings": {
     "EIGHTK4_GUARD_MODE": "warn"

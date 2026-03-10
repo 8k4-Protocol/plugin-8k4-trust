@@ -12,7 +12,7 @@ git log --oneline -n 5
 
 # 3) add the new GitHub repo remote
 # replace with the real repo URL if needed
-git remote add origin git@github.com:8k4protocol/plugin-8k4-trust.git
+git remote add origin git@github.com-8k4org:8k4-Protocol/plugin-8k4-trust.git
 
 # 4) push the current extraction branch
 git push -u origin feature/initial-standalone-extract

@@ -1,5 +1,5 @@
 {
-  "name": "@8k4/plugin-trust",
+  "name": "@8k4protocol/plugin-trust",
   "version": "0.1.0",
   "description": "8K4 Protocol trust scoring plugin for ElizaOS — check agent trust scores before interacting",
   "type": "module",
@@ -40,15 +40,15 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/8k4protocol/plugin-8k4-trust.git"
+    "url": "git+https://github.com/8k4-Protocol/plugin-8k4-trust.git"
   },
-  "homepage": "https://github.com/8k4protocol/plugin-8k4-trust#readme",
+  "homepage": "https://github.com/8k4-Protocol/plugin-8k4-trust#readme",
   "bugs": {
-    "url": "https://github.com/8k4protocol/plugin-8k4-trust/issues"
+    "url": "https://github.com/8k4-Protocol/plugin-8k4-trust/issues"
   },
   "elizaos": {
     "type": "plugin",
-    "name": "@8k4/plugin-trust",
+    "name": "@8k4protocol/plugin-trust",
     "displayName": "8K4 Trust Plugin",
     "category": "trust-and-safety"
   }

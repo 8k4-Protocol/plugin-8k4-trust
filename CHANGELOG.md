@@ -2,7 +2,7 @@
 
 ## 0.1.0
 
-- Initial standalone release of `@8k4/plugin-trust`
+- Initial standalone release of `@8k4protocol/plugin-trust`
 - `CHECK_AGENT_TRUST` action for agent ID and wallet trust checks
 - `FIND_TRUSTED_AGENT` action for trusted counterparty discovery
 - Trust guard pre-evaluator with `off|warn|block` modes

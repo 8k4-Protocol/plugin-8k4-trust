@@ -1,14 +1,14 @@
-# @8k4/plugin-trust
+# @8k4protocol/plugin-trust
 
-`@8k4/plugin-trust` adds trust-aware behavior to ElizaOS agents using 8K4 Protocol trust APIs: explicit trust checks (`CHECK_AGENT_TRUST`), trusted counterparty discovery (`FIND_TRUSTED_AGENT`), a pre-evaluator trust guard (`off/warn/block`), and a lightweight trust context provider powered by free `/agents/top` data.
+`@8k4protocol/plugin-trust` adds trust-aware behavior to ElizaOS agents using 8K4 Protocol trust APIs: explicit trust checks (`CHECK_AGENT_TRUST`), trusted counterparty discovery (`FIND_TRUSTED_AGENT`), a pre-evaluator trust guard (`off/warn/block`), and a lightweight trust context provider powered by free `/agents/top` data.
 
 ## Install
 
 ```bash
-bun add @8k4/plugin-trust
+bun add @8k4protocol/plugin-trust
 ```
 
-(or `npm i @8k4/plugin-trust`)
+(or `npm i @8k4protocol/plugin-trust`)
 
 ## What this plugin gives you
 
@@ -22,20 +22,20 @@ bun add @8k4/plugin-trust
 Clone and link locally:
 
 ```bash
-git clone https://github.com/8k4protocol/plugin-8k4-trust
+git clone https://github.com/8k4-Protocol/plugin-8k4-trust
 cd plugin-8k4-trust
 bun install
 bun run build
 bun link
 
 # In your ElizaOS project:
-bun link @8k4/plugin-trust
+bun link @8k4protocol/plugin-trust
 ```
 
 ## Register in your character
 
 ```ts
-import trustPlugin from "@8k4/plugin-trust";
+import trustPlugin from "@8k4protocol/plugin-trust";
 
 export default {
   name: "MyAgent",
@@ -48,7 +48,7 @@ Or in JSON-style character configs:
 ```json
 {
   "name": "TrustTestAgent",
-  "plugins": ["@8k4/plugin-trust"]
+  "plugins": ["@8k4protocol/plugin-trust"]
 }
 ```
 
