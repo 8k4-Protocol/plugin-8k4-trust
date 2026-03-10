@@ -78,6 +78,40 @@ describe("trust guard evaluator", () => {
     expect(result.reason).toContain("Blocked by trust guard");
   });
 
+  it("blocks in block mode for legacy risk_band=high during mixed-version rollout", async () => {
+    const trustService = {
+      checkTrust: vi.fn().mockResolvedValue({
+        score: 85,
+        trust_tier: "low",
+        risk_band: "high",
+        confidence: "medium",
+      }),
+    } as Partial<TrustService>;
+
+    const runtime = createRuntime({ EIGHTK4_GUARD_MODE: "block" }, trustService);
+    const result = await trustGuardEvaluator.handler(runtime, { content: { text: "agent:777" } } as any);
+
+    expect(result.blocked).toBe(true);
+    expect(result.reason).toContain("risk_band=high");
+  });
+
+  it("blocks in block mode for legacy risk_band=critical during mixed-version rollout", async () => {
+    const trustService = {
+      checkTrust: vi.fn().mockResolvedValue({
+        score: 90,
+        trust_tier: "unknown",
+        risk_band: "critical",
+        confidence: "medium",
+      }),
+    } as Partial<TrustService>;
+
+    const runtime = createRuntime({ EIGHTK4_GUARD_MODE: "block" }, trustService);
+    const result = await trustGuardEvaluator.handler(runtime, { content: { text: "agent:888" } } as any);
+
+    expect(result.blocked).toBe(true);
+    expect(result.reason).toContain("risk_band=critical");
+  });
+
   it("blocks in block mode for minimal trust tier even with a decent score", async () => {
     const trustService = {
       checkTrust: vi.fn().mockResolvedValue({ score: 85, trust_tier: "minimal", confidence: "high" }),

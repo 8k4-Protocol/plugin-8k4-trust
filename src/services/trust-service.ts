@@ -58,6 +58,24 @@ function mapRiskBandToTrustTier(riskBand: string | undefined): string | undefine
   return undefined;
 }
 
+function mapTrustTierToRiskBand(trustTier: string | undefined): string | undefined {
+  if (!trustTier) return undefined;
+  const normalized = trustTier.toLowerCase();
+  if (normalized === "minimal" || normalized === "new") return "critical";
+  if (normalized === "low") return "high";
+  if (normalized === "medium") return "medium";
+  if (normalized === "high") return "low";
+  return undefined;
+}
+
+function toLegacyConfidenceTier(confidence: string | undefined): string | undefined {
+  if (!confidence) return undefined;
+  const normalized = confidence.trim();
+  if (normalized.length === 0) return undefined;
+  const lower = normalized.toLowerCase();
+  return lower.charAt(0).toUpperCase() + lower.slice(1);
+}
+
 export class TrustService extends Service {
   static serviceType = "8k4_trust" as const;
   capabilityDescription = "8K4 trust scoring and trusted agent discovery";
@@ -130,6 +148,16 @@ export class TrustService extends Service {
       confidence: normalized.confidence,
       adjusted: normalized.adjusted,
       adjustment_reasons: normalized.adjustment_reasons,
+      risk_band: normalized.risk_band ?? "unknown",
+      confidence_tier: normalized.confidence_tier ?? "Unknown",
+      promotion_cap_applied:
+        "promotion_cap_applied" in normalized
+          ? normalized.promotion_cap_applied
+          : normalized.adjusted,
+      promotion_cap_reasons:
+        "promotion_cap_reasons" in normalized
+          ? normalized.promotion_cap_reasons ?? normalized.adjustment_reasons
+          : normalized.adjustment_reasons,
       raw: normalized,
     };
   }
@@ -158,6 +186,11 @@ export class TrustService extends Service {
       confidence: normalizedData.confidence ?? "unknown",
       adjusted: normalizedData.adjusted ?? false,
       adjustment_reasons: normalizedData.adjustment_reasons ?? [],
+      risk_band: normalizedData.risk_band ?? "unknown",
+      confidence_tier: normalizedData.confidence_tier ?? "Unknown",
+      promotion_cap_applied: normalizedData.promotion_cap_applied ?? normalizedData.adjusted ?? false,
+      promotion_cap_reasons:
+        normalizedData.promotion_cap_reasons ?? normalizedData.adjustment_reasons ?? [],
       raw: normalizedData,
     };
   }
@@ -229,17 +262,27 @@ export class TrustService extends Service {
     data: ScorePublicResponse | ScoreExplainResponse,
   ): ScorePublicResponse | ScoreExplainResponse {
     const payload = data as unknown as TrustPayload;
+    const scoreTier = this.readScoreTier(payload) ?? "unknown";
+    const trustTier = this.readTrustTier(payload) ?? "unknown";
+    const confidence = this.readConfidence(payload) ?? "unknown";
+    const adjusted = this.readAdjusted(payload) ?? false;
+    const adjustmentReasons = this.readAdjustmentReasons(payload);
+    const riskBand = this.readRiskBand(payload, trustTier) ?? "unknown";
+    const confidenceTier = this.readLegacyConfidenceTier(payload, confidence) ?? "Unknown";
+
     const normalizedBase: ScorePublicResponse = {
       ...data,
       agent_id: Number(data.agent_id),
       chain: typeof data.chain === "string" ? data.chain : "",
       global_id: typeof data.global_id === "string" ? data.global_id : "",
       score: Number(data.score),
-      score_tier: this.readScoreTier(payload) ?? "unknown",
-      trust_tier: this.readTrustTier(payload) ?? "unknown",
-      confidence: this.readConfidence(payload) ?? "unknown",
-      adjusted: this.readAdjusted(payload) ?? false,
-      adjustment_reasons: this.readAdjustmentReasons(payload),
+      score_tier: scoreTier,
+      trust_tier: trustTier,
+      confidence,
+      adjusted,
+      adjustment_reasons: adjustmentReasons,
+      risk_band: riskBand,
+      confidence_tier: confidenceTier,
       validator_count_bucket:
         typeof data.validator_count_bucket === "string" ? data.validator_count_bucket : "",
       as_of: typeof data.as_of === "string" ? data.as_of : "",
@@ -251,6 +294,14 @@ export class TrustService extends Service {
         ...normalizedBase,
         positives: readStringArray((data as unknown as TrustPayload).positives) ?? [],
         cautions: readStringArray((data as unknown as TrustPayload).cautions) ?? [],
+        final_tier: readTrimmedString(payload.final_tier) ?? scoreTier,
+        candidate_tier: readTrimmedString(payload.candidate_tier),
+        promotion_cap_applied: this.readLegacyPromotionCapApplied(payload, adjusted) ?? adjusted,
+        promotion_cap_reasons: this.readLegacyPromotionCapReasons(payload, adjustmentReasons),
+        promotion_cap_to:
+          typeof payload.promotion_cap_to === "string" || payload.promotion_cap_to === null
+            ? (payload.promotion_cap_to as string | null)
+            : null,
       };
     }
 
@@ -270,12 +321,20 @@ export class TrustService extends Service {
     const confidence = this.readConfidence(payload);
     const adjusted = this.readAdjusted(payload);
     const adjustmentReasons = this.readAdjustmentReasons(payload);
+    const riskBand = this.readRiskBand(payload, trustTier);
+    const confidenceTier = this.readLegacyConfidenceTier(payload, confidence);
+    const promotionCapApplied = this.readLegacyPromotionCapApplied(payload, adjusted);
+    const promotionCapReasons = this.readLegacyPromotionCapReasons(payload, adjustmentReasons);
 
     if (scoreTier) normalized.score_tier = scoreTier;
     if (trustTier) normalized.trust_tier = trustTier;
     if (confidence) normalized.confidence = confidence;
     if (adjusted !== undefined) normalized.adjusted = adjusted;
-    if (adjustmentReasons.length > 0) normalized.adjustment_reasons = adjustmentReasons;
+    normalized.adjustment_reasons = adjustmentReasons;
+    if (riskBand) normalized.risk_band = riskBand;
+    if (confidenceTier) normalized.confidence_tier = confidenceTier;
+    if (promotionCapApplied !== undefined) normalized.promotion_cap_applied = promotionCapApplied;
+    normalized.promotion_cap_reasons = promotionCapReasons;
 
     return normalized;
   }
@@ -293,12 +352,20 @@ export class TrustService extends Service {
     const confidence = this.readConfidence(payload);
     const adjusted = this.readAdjusted(payload);
     const adjustmentReasons = this.readAdjustmentReasons(payload);
+    const riskBand = this.readRiskBand(payload, trustTier);
+    const confidenceTier = this.readLegacyConfidenceTier(payload, confidence);
+    const promotionCapApplied = this.readLegacyPromotionCapApplied(payload, adjusted);
+    const promotionCapReasons = this.readLegacyPromotionCapReasons(payload, adjustmentReasons);
 
     if (scoreTier) normalized.score_tier = scoreTier;
     if (trustTier) normalized.trust_tier = trustTier;
     if (confidence) normalized.confidence = confidence;
     if (adjusted !== undefined) normalized.adjusted = adjusted;
-    if (adjustmentReasons.length > 0) normalized.adjustment_reasons = adjustmentReasons;
+    normalized.adjustment_reasons = adjustmentReasons;
+    if (riskBand) normalized.risk_band = riskBand;
+    if (confidenceTier) normalized.confidence_tier = confidenceTier;
+    if (promotionCapApplied !== undefined) normalized.promotion_cap_applied = promotionCapApplied;
+    normalized.promotion_cap_reasons = promotionCapReasons;
 
     return normalized;
   }
@@ -316,9 +383,22 @@ export class TrustService extends Service {
       ?? mapRiskBandToTrustTier(readLowercaseString(payload.risk_band));
   }
 
+  private readRiskBand(payload: TrustPayload, trustTier?: string): string | undefined {
+    return readLowercaseString(payload.risk_band)
+      ?? mapTrustTierToRiskBand(trustTier ?? readLowercaseString(payload.trust_tier));
+  }
+
   private readConfidence(payload: TrustPayload): string | undefined {
     return readLowercaseString(payload.confidence)
       ?? readLowercaseString(payload.confidence_tier);
+  }
+
+  private readLegacyConfidenceTier(
+    payload: TrustPayload,
+    confidence?: string,
+  ): string | undefined {
+    return readTrimmedString(payload.confidence_tier)
+      ?? toLegacyConfidenceTier(confidence ?? this.readConfidence(payload));
   }
 
   private readAdjusted(payload: TrustPayload): boolean | undefined {
@@ -326,10 +406,28 @@ export class TrustService extends Service {
       ?? readBoolean(payload.promotion_cap_applied);
   }
 
+  private readLegacyPromotionCapApplied(
+    payload: TrustPayload,
+    adjusted?: boolean,
+  ): boolean | undefined {
+    return readBoolean(payload.promotion_cap_applied)
+      ?? adjusted
+      ?? this.readAdjusted(payload);
+  }
+
   private readAdjustmentReasons(payload: TrustPayload): string[] {
     return readStringArray(payload.adjustment_reasons)
       ?? readStringArray(payload.promotion_cap_reasons)
       ?? [];
+  }
+
+  private readLegacyPromotionCapReasons(
+    payload: TrustPayload,
+    adjustmentReasons?: string[],
+  ): string[] {
+    return readStringArray(payload.promotion_cap_reasons)
+      ?? adjustmentReasons
+      ?? this.readAdjustmentReasons(payload);
   }
 
   private getCached<T>(key: string): T | undefined {

@@ -1,6 +1,20 @@
-export type PublicConfidence = "minimal" | "low" | "medium" | "high" | string;
-export type TrustTier = "new" | "minimal" | "low" | "medium" | "high" | string;
+export type PublicConfidence = "minimal" | "low" | "medium" | "high" | "unknown" | string;
+export type TrustTier = "new" | "minimal" | "low" | "medium" | "high" | "unknown" | string;
 export type ScoreTier = string;
+export type LegacyConfidenceTier = "Minimal" | "Low" | "Medium" | "High" | "Unknown" | string;
+export type LegacyRiskBand = "low" | "medium" | "high" | "critical" | "unknown" | string;
+
+export interface LegacyTrustAliases {
+  // Transitional aliases preserved for downstream mixed-version consumers.
+  risk_band?: LegacyRiskBand;
+  confidence_tier?: LegacyConfidenceTier;
+}
+
+export interface LegacyAdjustmentAliases {
+  // Transitional aliases preserved for downstream mixed-version consumers.
+  promotion_cap_applied?: boolean;
+  promotion_cap_reasons?: string[];
+}
 
 export interface PublicTrustFields {
   score_tier: ScoreTier;
@@ -10,7 +24,7 @@ export interface PublicTrustFields {
   adjustment_reasons: string[];
 }
 
-export interface ScorePublicResponse extends PublicTrustFields {
+export interface ScorePublicResponse extends PublicTrustFields, LegacyTrustAliases {
   agent_id: number;
   chain: string;
   global_id: string;
@@ -20,13 +34,16 @@ export interface ScorePublicResponse extends PublicTrustFields {
   disclaimer: string;
 }
 
-export interface ScoreExplainResponse extends ScorePublicResponse {
+export interface ScoreExplainResponse extends ScorePublicResponse, LegacyAdjustmentAliases {
+  candidate_tier?: ScoreTier;
+  final_tier?: ScoreTier;
+  promotion_cap_to?: string | null;
   positives: string[];
   cautions: string[];
 }
 
 // Best-effort typing: wallet score response fields are not fully verified against the live API yet.
-export interface WalletScoreResponse {
+export interface WalletScoreResponse extends LegacyTrustAliases, LegacyAdjustmentAliases {
   wallet: string;
   chain?: string;
   score: number;
@@ -40,7 +57,7 @@ export interface WalletScoreResponse {
   [key: string]: unknown;
 }
 
-export interface AgentSearchItem {
+export interface AgentSearchItem extends LegacyTrustAliases, LegacyAdjustmentAliases {
   agent_id: number;
   rank?: number;
   wallet?: string;
@@ -68,7 +85,7 @@ export type AgentSearchResponse =
 
 export type TopAgentsResponse = AgentSearchItem[];
 
-export interface TrustCheckResult {
+export interface TrustCheckResult extends LegacyTrustAliases, LegacyAdjustmentAliases {
   kind: "agent" | "wallet";
   score: number;
   chain?: string;

@@ -79,6 +79,48 @@ describe("TrustService", () => {
     expect(result.confidence).toBe("high");
     expect(result.adjusted).toBe(true);
     expect(result.adjustment_reasons).toEqual(["legacy cap"]);
+    expect(result.risk_band).toBe("low");
+    expect(result.confidence_tier).toBe("High");
+    expect(result.promotion_cap_applied).toBe(true);
+    expect(result.promotion_cap_reasons).toEqual(["legacy cap"]);
+    expect((result.raw as any).risk_band).toBe("low");
+    expect((result.raw as any).confidence_tier).toBe("High");
+  });
+
+  it("preserves transitional legacy aliases for new-format score responses", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        agent_id: 6888,
+        chain: "base",
+        global_id: "base:6888",
+        score: 42,
+        score_tier: "medium",
+        trust_tier: "low",
+        confidence: "medium",
+        adjusted: true,
+        adjustment_reasons: ["new pipeline cap"],
+        validator_count_bucket: "10+",
+        as_of: "2026-03-10T00:00:00Z",
+        disclaimer: "test",
+      }),
+    });
+    setFetchMock(fetchMock);
+
+    const service = new TrustService(createRuntime({ EIGHTK4_API_KEY: "test-key" }));
+    const result = await service.checkTrust(6888, "base", false);
+
+    expect(result.score_tier).toBe("medium");
+    expect(result.trust_tier).toBe("low");
+    expect(result.confidence).toBe("medium");
+    expect(result.adjusted).toBe(true);
+    expect(result.adjustment_reasons).toEqual(["new pipeline cap"]);
+    expect(result.risk_band).toBe("high");
+    expect(result.confidence_tier).toBe("Medium");
+    expect(result.promotion_cap_applied).toBe(true);
+    expect(result.promotion_cap_reasons).toEqual(["new pipeline cap"]);
+    expect((result.raw as any).risk_band).toBe("high");
+    expect((result.raw as any).confidence_tier).toBe("Medium");
   });
 
   it("caches trust checks so second call does not fetch again", async () => {
@@ -218,6 +260,8 @@ describe("TrustService", () => {
     expect(results[0].rank).toBe(1);
     expect(results[0].wallet).toBe("0x1111111111111111111111111111111111111111");
     expect(results[0].trust_tier).toBe("high");
+    expect(results[0].risk_band).toBe("low");
+    expect(results[0].confidence_tier).toBe("High");
   });
 
   it("rejects malformed wallet addresses in checkWalletTrust", async () => {
