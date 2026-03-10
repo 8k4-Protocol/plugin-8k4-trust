@@ -1,6 +1,6 @@
 {
   "name": "@8k4protocol/plugin-trust",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "8K4 Protocol trust scoring plugin for ElizaOS — check agent trust scores before interacting",
   "type": "module",
   "main": "dist/index.js",
