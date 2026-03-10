@@ -10,6 +10,13 @@ bun add @8k4/plugin-trust
 
 (or `npm i @8k4/plugin-trust`)
 
+## What this plugin gives you
+
+- `CHECK_AGENT_TRUST` — check trust for an ERC-8004 agent ID or wallet
+- `FIND_TRUSTED_AGENT` — search for trusted counterparties for a task
+- trust guard pre-evaluator — warn or block before risky interactions
+- trust context provider — inject current `/agents/top` trust context into runtime
+
 ## Development / Local Install
 
 Clone and link locally:
@@ -34,6 +41,15 @@ export default {
   name: "MyAgent",
   plugins: [trustPlugin],
 };
+```
+
+Or in JSON-style character configs:
+
+```json
+{
+  "name": "TrustTestAgent",
+  "plugins": ["@8k4/plugin-trust"]
+}
 ```
 
 ## Configuration
@@ -70,6 +86,15 @@ EIGHTK4_API_KEY=your-api-key-here
 EIGHTK4_GUARD_MODE=block
 # block mode defaults to fail-closed — no need to set EIGHTK4_GUARD_FAIL_MODE
 ```
+
+## Tested runtime status
+
+Validated in a live ElizaOS runtime with:
+- plugin boot/loading
+- `CHECK_AGENT_TRUST`
+- `FIND_TRUSTED_AGENT`
+- bare-number negative case (`roadmap 2026 has 3 milestones`)
+- browser UI response path
 
 ## Security model
 
@@ -174,6 +199,15 @@ The plugin only allows `api.8k4protocol.com` by default. For staging/custom host
 
 **Agent ID not recognized from conversation text**
 The plugin intentionally ignores bare numbers. Use explicit forms: `agent:6888`, `agent_id=6888`, `erc8004:6888`, or `8k4:6888`. Or pass the ID via `parameters.agentId`.
+
+## Publish checklist
+
+Before publishing publicly:
+- run `npm install`
+- run `npm run build`
+- run `npm run test`
+- verify install/link in a clean ElizaOS project
+- confirm package scope/ownership on npm
 
 ## References
 
